@@ -42,6 +42,8 @@ use socketcan;
 pub use socketcan::CANFrame;
 pub use socketcan::CANSocketOpenError;
 
+use std::mem::uninitialized;
+
 /// A Future representing the eventual
 /// writing of a CANFrame to the socket
 ///
@@ -157,6 +159,27 @@ impl CANSocket {
             frame: frame,
         }
     }
+
+    fn get_frame_time(&self) -> u128 {
+        let raw_fd = self.0.get_ref().0.as_raw_fd();
+        const SIOCGSTAMP: libc::c_int = 0x8906;
+
+        let mut ts: libc::timespec;
+        let rval = unsafe {
+            ts = uninitialized();
+            libc::ioctl(
+                raw_fd,
+                SIOCGSTAMP as libc::c_ulong,
+                &mut ts as *mut libc::timespec,
+            )
+        };
+
+        if rval == -1 {
+            panic!("ioctl syscall failed {:?}", io::Error::last_os_error());
+        }
+
+        (ts.tv_sec as u128 * 1000) + (ts.tv_nsec as u128 / 1000)
+    }
 }
 
 impl Clone for CANSocket {
@@ -180,7 +203,7 @@ impl Clone for CANSocket {
 }
 
 impl Stream for CANSocket {
-    type Item = CANFrame;
+    type Item = (CANFrame, u128);
     type Error = io::Error;
 
     fn poll(&mut self) -> Result<Async<Option<Self::Item>>, Self::Error> {
@@ -188,7 +211,10 @@ impl Stream for CANSocket {
             .0
             .poll_read_ready(Ready::readable() | UnixReady::error()));
         match self.0.get_ref().get_ref().read_frame() {
-            Ok(frame) => Ok(Async::Ready(Some(frame))),
+            Ok(frame) => {
+                let time = self.get_frame_time();
+                Ok(Async::Ready(Some((frame, time))))
+            }
             Err(err) => {
                 if err.kind() == io::ErrorKind::WouldBlock {
                     self.0.clear_read_ready(Ready::readable())?;
