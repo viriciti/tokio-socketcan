@@ -26,6 +26,7 @@
 use std::io;
 use std::os::raw::c_uint;
 use std::os::unix::io::{AsRawFd, FromRawFd};
+use std::convert::TryInto;
 
 use libc;
 
@@ -169,7 +170,7 @@ impl CANSocket {
             ts = uninitialized();
             libc::ioctl(
                 raw_fd,
-                SIOCGSTAMP as libc::c_ulong,
+                (SIOCGSTAMP as libc::c_ulong).try_into().unwrap(),
                 &mut ts as *mut libc::timespec,
             )
         };
