@@ -14,7 +14,12 @@ mio = "0.6"
 libc = "0.2"
 thiserror = "1.0"
 tokio = { version = "0.2", features = ["net", "macros"] }
+stubborn-io = "0.1.9"
 
 [dev-dependencies]
 futures-timer = "3.0"
 futures-util = "0.3"
+
+[features]
+stubborn_io = []
+driver_time = []
