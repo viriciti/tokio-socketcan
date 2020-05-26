@@ -196,6 +196,9 @@ impl CANSocket {
 use std::mem::MaybeUninit;
 
 #[cfg(feature = "driver_time")]
+use std::convert::TryInto;
+
+#[cfg(feature = "driver_time")]
 impl CANSocket {
     fn get_frame_time(&self) -> u128 {
         let raw_fd = self.0.get_ref().0.as_raw_fd();
@@ -206,7 +209,7 @@ impl CANSocket {
             ts = MaybeUninit::<libc::timespec>::uninit().assume_init();
             libc::ioctl(
                 raw_fd,
-                SIOCGSTAMP as libc::c_ulong,
+                (SIOCGSTAMP as libc::c_ulong).try_into().unwrap(),
                 &mut ts as *mut libc::timespec,
             )
         };
@@ -243,6 +246,7 @@ impl Stream for CANSocket {
         }
     }
 }
+
 #[cfg(not(feature = "driver_time"))]
 impl Stream for CANSocket {
     type Item = io::Result<CANFrame>;
