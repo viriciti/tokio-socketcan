@@ -21,7 +21,7 @@
 //!     let socket_tx = CANSocket::open("vcan0")?;
 //!
 //!     while let Some(Ok(frame)) = socket_rx.next().await {
-//!         socket_tx.write_frame(frame)?.await;
+//!         socket_tx.write_frame(frame.0)?.await;
 //!     }
 //!     Ok(())
 //! }
@@ -190,6 +190,51 @@ impl CANSocket {
     }
 }
 
+#[cfg(feature = "driver_time")]
+use std::mem::MaybeUninit;
+
+#[cfg(feature = "driver_time")]
+impl CANSocket {
+    fn get_frame_time(&self) -> u128 {
+        let raw_fd = self.0.get_ref().0.as_raw_fd();
+        const SIOCGSTAMP: libc::c_ulong = 0x8906;
+
+        let (rval, ts) = unsafe {
+            let time = MaybeUninit::<libc::timespec>::uninit();
+            let ret = libc::ioctl(raw_fd, SIOCGSTAMP, time.as_ptr());
+            (ret, time.assume_init())
+        };
+
+        if rval == -1 {
+            panic!("ioctl syscall failed {:?}", io::Error::last_os_error());
+        }
+
+        (ts.tv_sec as u128 * 1000) + (ts.tv_nsec as u128 / 1000)
+    }
+}
+
+#[cfg(feature = "driver_time")]
+impl Stream for CANSocket {
+    type Item = io::Result<(CANFrame, u128)>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
+        loop {
+            let mut ready_guard = ready!(self.0.poll_read_ready(cx))?;
+            match ready_guard.try_io(|inner| inner.get_ref().get_ref().read_frame()) {
+                Ok(result) => {
+                    let res = result.map(|frame| {
+                        let time = self.get_frame_time();
+                        (frame, time)
+                    });
+                    return Poll::Ready(Some(res));
+                }
+                Err(_would_block) => continue,
+            }
+        }
+    }
+}
+
+#[cfg(not(feature = "driver_time"))]
 impl Stream for CANSocket {
     type Item = io::Result<CANFrame>;
 
@@ -227,6 +272,28 @@ impl Sink<CANFrame> for CANSocket {
         Ok(())
     }
 }
+
+#[cfg(feature = "stubborn_io")]
+use stubborn_io::tokio::{StubbornIo, UnderlyingIo};
+
+#[cfg(feature = "stubborn_io")]
+pub use stubborn_io::ReconnectOptions;
+
+#[cfg(feature = "stubborn_io")]
+impl UnderlyingIo<String> for CANSocket {
+    // Establishes an io connection.
+    // Additionally, this will be used when reconnect tries are attempted.
+    fn establish(interface: String) -> Pin<Box<dyn Future<Output = io::Result<Self>> + Send>> {
+        Box::pin(async move {
+            // In this case, we are trying to "connect" a file that
+            // should exist on the system
+            Ok(CANSocket::open(&interface).expect("CanSocketWrapper: could not open can socket"))
+        })
+    }
+}
+
+#[cfg(feature = "stubborn_io")]
+pub type StubbornCanStream<String> = StubbornIo<CANSocket, String>;
 
 #[cfg(test)]
 mod tests {
@@ -289,7 +356,7 @@ mod tests {
 
         let count_ids_less_than_3 = stream
             .map(|x| x.unwrap())
-            .take_while(|frame| future::ready(frame.id() < 3))
+            .take_while(|frame| future::ready(frame.0.id() < 3))
             .fold(0u8, |acc, _frame| async move { acc + 1 });
 
         let send_frames = async {
