@@ -1,6 +1,6 @@
 [package]
 name = "tokio-socketcan"
-version = "0.2.0"
+version = "0.3.1"
 authors = ["Terry Kerr <root@oefd.ca>"]
 edition = "2018"
 description = "Asynchronous Linux SocketCAN sockets with tokio"
@@ -10,16 +10,23 @@ repository = "https://github.com/oefd/tokio-socketcan"
 [dependencies]
 socketcan = "1.7"
 futures = "0.3"
-mio = "0.6"
+mio = { version = "0.8", features = ["os-ext"] }
 libc = "0.2"
 thiserror = "1.0"
-tokio = { version = "0.2", features = ["net", "macros"] }
+tokio = { version = "1", features = ["net"] }
 stubborn-io = "0.1.9"
 
 [dev-dependencies]
 futures-timer = "3.0"
 futures-util = "0.3"
 
+[dev-dependencies.tokio]
+version = "1"
+# required for tokio::test
+features = ["macros", "rt-multi-thread"]
+
+
 [features]
+default = ["driver_time", "stubborn_io"]
 stubborn_io = []
 driver_time = []

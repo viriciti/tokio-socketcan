@@ -1,4 +1,5 @@
 [![crates.io badge](https://img.shields.io/crates/v/tokio-socketcan.svg)](https://crates.io/crates/tokio-socketcan) [![documentation](https://img.shields.io/badge/documentation-docs.rs-green.svg)](https://docs.rs/tokio-socketcan)
+[![Continuous integration](https://github.com/oefd/tokio-socketcan/actions/workflows/ci.yml/badge.svg)](https://github.com/oefd/tokio-socketcan/actions/workflows/ci.yml)
 
 # tokio-socketcan
 
@@ -33,13 +34,3 @@ sudo ip link add vcan0 type vcan
 sudo ip link set vcan0 up
 cargo test
 ```
-
-# Changelog
-
-## 0.1.3
-
-* Fixed error events being effectively delayed in delivery until the next non-error arrived.
-
-## 0.1.2
-
-* Added `futures::sink::Sink` implementation for the `CANSocket`
