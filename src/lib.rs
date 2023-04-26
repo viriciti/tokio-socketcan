@@ -197,6 +197,10 @@ use std::mem::MaybeUninit;
 impl CANSocket {
     fn get_frame_time(&self) -> u128 {
         let raw_fd = self.0.get_ref().0.as_raw_fd();
+
+        #[cfg(target_env = "musl")]
+        const SIOCGSTAMP: i32 = 0x8906;
+        #[cfg(not(target_env = "musl"))]
         const SIOCGSTAMP: libc::c_ulong = 0x8906;
 
         let (rval, ts) = unsafe {
