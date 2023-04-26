@@ -26,12 +26,13 @@
 //!     Ok(())
 //! }
 //! ```
+use std::future::Future;
 use std::io;
 use std::os::raw::c_uint;
 use std::os::unix::io::{AsRawFd, FromRawFd};
+use std::os::unix::prelude::RawFd;
 use std::pin::Pin;
 use std::task::Poll;
-use std::{future::Future, os::unix::prelude::RawFd};
 
 use futures::prelude::*;
 use futures::ready;
